@@ -530,6 +530,67 @@
         .picnic-resp.show { display: block; }
         @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
+        /* ── HEARTS GAME ── */
+        .game-overlay {
+            position: fixed; inset: 0; z-index: 260;
+            background: rgba(10,5,24,.92); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center; padding: 16px;
+            opacity: 0; visibility: hidden; transition: opacity .35s, visibility .35s;
+        }
+        .game-overlay.show { opacity: 1; visibility: visible; }
+        .game-card {
+            background: linear-gradient(160deg,#1e0d45,#0a0520);
+            border: 1px solid var(--glass-b); border-radius: 24px;
+            width: 100%; max-width: 400px;
+            display: flex; flex-direction: column;
+            height: min(88svh, 600px); overflow: hidden;
+        }
+        .game-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px 10px; flex-shrink: 0;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+        }
+        .game-stat { font-size: 1.15rem; font-weight: 700; color: var(--cream); min-width: 56px; }
+        .game-title-sm { font-family: 'Cormorant Garamond',serif; font-size: 1.2rem; font-weight: 600; color: var(--star-color); }
+        .game-field {
+            flex: 1; position: relative; overflow: hidden;
+            background: radial-gradient(ellipse at 50% 0%, rgba(45,16,96,.6) 0%, transparent 70%);
+            cursor: pointer; -webkit-tap-highlight-color: transparent;
+        }
+        .heart-drop {
+            position: absolute; font-size: 1.8rem; line-height: 1;
+            user-select: none; pointer-events: none;
+            animation: heartFall var(--spd,2s) linear forwards;
+        }
+        @keyframes heartFall {
+            0% { transform: translateY(-40px) scale(.8) rotate(var(--rot,-8deg)); opacity: 1; }
+            85% { opacity: 1; }
+            100% { transform: translateY(var(--dist,500px)) scale(1) rotate(var(--rot,-8deg)); opacity: .2; }
+        }
+        .heart-pop {
+            position: absolute; font-size: 1.6rem; pointer-events: none;
+            animation: heartPop .5s ease forwards;
+        }
+        @keyframes heartPop {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(2.2) translateY(-24px); opacity: 0; }
+        }
+        .miss-flash { animation: missFlash .25s ease; }
+        @keyframes missFlash { 0%,100%{background:transparent} 50%{background:rgba(255,60,60,.18)} }
+        .game-over {
+            position: absolute; inset: 0;
+            background: rgba(10,5,24,.88); backdrop-filter: blur(6px);
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 24px; text-align: center;
+        }
+        .game-over.hidden { display: none !important; }
+        .game-over-title {
+            font-family: 'Cormorant Garamond',serif; font-size: 2rem; font-weight: 700;
+            color: var(--rose-light); margin-bottom: .5rem;
+        }
+        .game-over-score { font-size: 1.25rem; color: var(--star-color); margin-bottom: .25rem; font-weight: 600; }
+        .game-over-best { font-size: 1rem; color: var(--text-soft); margin-bottom: .5rem; }
+
         /* ── REDUCED MOTION ── */
         @media (prefers-reduced-motion: reduce) {
             .sparkle-fall, .shooting, .heart-path, .cline, .cstar, .cphoto,
@@ -656,6 +717,27 @@
         <img class="popup-img" id="popupImg" src="" alt="">
         <p class="popup-label" id="popupLabel"></p>
         <button class="btn popup-close" id="popupClose">Закрыть</button>
+    </div>
+</div>
+
+<!-- HEARTS GAME OVERLAY -->
+<div class="game-overlay" id="gameOverlay">
+    <div class="game-card">
+        <div class="game-header">
+            <div class="game-stat">❤️ <span id="gameLives">3</span></div>
+            <div class="game-title-sm">Лови сердечки!</div>
+            <div class="game-stat">✦ <span id="gameScore">0</span></div>
+        </div>
+        <div class="game-field" id="gameField"></div>
+        <div class="game-over hidden" id="gameOver">
+            <p class="game-over-title">Игра окончена!</p>
+            <p class="game-over-score">Твой рекорд: <span id="gameFinalScore">0</span> ❤️</p>
+            <p class="game-over-best hidden" id="gameBestWrap">Лучший результат: <span id="gameBest">0</span> ❤️</p>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;">
+                <button class="btn" id="gameRestartBtn">Ещё раз</button>
+                <button class="btn btn-outline" id="gameCloseBtn">Закрыть</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1495,11 +1577,150 @@ $('#picnicConfirmBtn').addEventListener('click', () => {
 
 $('#picnicCloseBtn').addEventListener('click', () => {
     $('#picnicOverlay').classList.remove('show');
+    setTimeout(showHeartsGame, 400);
 });
 
 /* ─────────────────────────────────────────────
    INIT
 ───────────────────────────────────────────── */
+/* ─────────────────────────────────────────────
+   HEARTS GAME
+───────────────────────────────────────────── */
+const game = {
+    lives: 3, score: 0, best: 0,
+    speed: 2.2,        // начальная скорость (секунды на падение)
+    spawnInterval: 1100, // мс между сердечками
+    running: false,
+    spawnTimer: null,
+    hearts: [],        // активные элементы
+    heartId: 0
+};
+
+function startHeartsGame() {
+    game.lives = 3; game.score = 0; game.speed = 2.2; game.spawnInterval = 1100;
+    game.running = true; game.heartId = 0;
+    $('#gameLives').textContent = game.lives;
+    $('#gameScore').textContent = game.score;
+    $('#gameOver').classList.add('hidden');
+    $('#gameField').innerHTML = '';
+    scheduleSpawn();
+}
+
+function scheduleSpawn() {
+    clearTimeout(game.spawnTimer);
+    if (!game.running) return;
+    game.spawnTimer = setTimeout(() => {
+        spawnHeart();
+        // постепенное ускорение
+        game.spawnInterval = Math.max(400, game.spawnInterval * 0.97);
+        game.speed         = Math.max(0.6, game.speed * 0.97);
+        scheduleSpawn();
+    }, game.spawnInterval);
+}
+
+function spawnHeart() {
+    const field = $('#gameField');
+    if (!field) return;
+    const id = ++game.heartId;
+    const emojis = ['❤️','🩷','💕','💗','💓','💖'];
+    const el = document.createElement('div');
+    el.className = 'heart-drop';
+    el.dataset.hid = id;
+    el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    const left = 5 + Math.random() * 85;
+    const rot  = -12 + Math.random() * 24;
+    const dist = field.clientHeight + 60;
+    el.style.cssText = `left:${left}%;top:0;--spd:${game.speed}s;--rot:${rot}deg;--dist:${dist}px;`;
+    field.appendChild(el);
+    game.hearts.push(id);
+
+    // когда сердечко долетело до низа — это промах
+    setTimeout(() => {
+        if (!game.running) return;
+        if (document.querySelector(`.heart-drop[data-hid="${id}"]`)) {
+            onMiss(id);
+        }
+    }, game.speed * 1000 + 100);
+}
+
+function onMiss(id) {
+    removeHeart(id);
+    game.lives--;
+    $('#gameLives').textContent = game.lives;
+    const field = $('#gameField');
+    if (field) { field.classList.add('miss-flash'); setTimeout(() => field.classList.remove('miss-flash'), 260); }
+    if (navigator.vibrate) navigator.vibrate(80);
+    if (game.lives <= 0) endGame();
+}
+
+function removeHeart(id) {
+    const el = document.querySelector(`.heart-drop[data-hid="${id}"]`);
+    if (el) el.remove();
+    game.hearts = game.hearts.filter(h => h !== id);
+}
+
+function endGame() {
+    game.running = false;
+    clearTimeout(game.spawnTimer);
+    document.querySelectorAll('.heart-drop').forEach(e => e.remove());
+    if (game.score > game.best) game.best = game.score;
+    $('#gameFinalScore').textContent = game.score;
+    const bestWrap = $('#gameBestWrap');
+    if (game.best > 0 && game.score < game.best) {
+        $('#gameBest').textContent = game.best;
+        bestWrap.classList.remove('hidden');
+    } else { bestWrap.classList.add('hidden'); }
+    $('#gameOver').classList.remove('hidden');
+}
+
+// Тап по полю — ловим сердечко под пальцем
+$('#gameField').addEventListener('click', e => {
+    if (!game.running) return;
+    const field = $('#gameField');
+    const rect  = field.getBoundingClientRect();
+    const tx = e.clientX - rect.left;
+    const ty = e.clientY - rect.top;
+    const hitRadius = 36;
+    const hearts = [...document.querySelectorAll('.heart-drop')];
+    let hit = null, bestDist = hitRadius;
+    hearts.forEach(h => {
+        const hr = h.getBoundingClientRect();
+        const hx = hr.left + hr.width/2 - rect.left;
+        const hy = hr.top  + hr.height/2 - rect.top;
+        const d  = Math.hypot(tx - hx, ty - hy);
+        if (d < bestDist) { bestDist = d; hit = h; }
+    });
+    if (hit) {
+        const id = parseInt(hit.dataset.hid);
+        // pop-эффект на месте
+        const pop = document.createElement('div');
+        pop.className = 'heart-pop';
+        pop.textContent = hit.textContent;
+        const hr = hit.getBoundingClientRect();
+        pop.style.left = (hr.left + hr.width/2 - rect.left) + 'px';
+        pop.style.top  = (hr.top  + hr.height/2 - rect.top) + 'px';
+        field.appendChild(pop);
+        setTimeout(() => pop.remove(), 520);
+        removeHeart(id);
+        game.score++;
+        $('#gameScore').textContent = game.score;
+        if (navigator.vibrate) navigator.vibrate(30);
+    }
+});
+
+$('#gameRestartBtn').addEventListener('click', startHeartsGame);
+$('#gameCloseBtn').addEventListener('click', () => {
+    game.running = false;
+    clearTimeout(game.spawnTimer);
+    document.querySelectorAll('.heart-drop').forEach(e => e.remove());
+    $('#gameOverlay').classList.remove('show');
+});
+
+function showHeartsGame() {
+    $('#gameOverlay').classList.add('show');
+    startHeartsGame();
+}
+
 buildStars();
 buildSparkles();
 scheduleShooting();
