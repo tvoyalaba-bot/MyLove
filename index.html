@@ -558,9 +558,12 @@
             cursor: pointer; -webkit-tap-highlight-color: transparent;
         }
         .heart-drop {
-            position: absolute; font-size: 1.8rem; line-height: 1;
+            position: absolute; font-size: 2.2rem; line-height: 1;
             user-select: none; pointer-events: none;
             animation: heartFall var(--spd,2s) linear forwards;
+            /* увеличиваем зону касания через padding */
+            padding: 14px;
+            margin: -14px;
         }
         @keyframes heartFall {
             0% { transform: translateY(-40px) scale(.8) rotate(var(--rot,-8deg)); opacity: 1; }
@@ -1588,8 +1591,8 @@ $('#picnicCloseBtn').addEventListener('click', () => {
 ───────────────────────────────────────────── */
 const game = {
     lives: 3, score: 0, best: 0,
-    speed: 2.2,        // начальная скорость (секунды на падение)
-    spawnInterval: 1100, // мс между сердечками
+    speed: 2.8,        // начальная скорость (секунды на падение)
+    spawnInterval: 1300, // мс между сердечками
     running: false,
     spawnTimer: null,
     hearts: [],        // активные элементы
@@ -1597,7 +1600,7 @@ const game = {
 };
 
 function startHeartsGame() {
-    game.lives = 3; game.score = 0; game.speed = 2.2; game.spawnInterval = 1100;
+    game.lives = 3; game.score = 0; game.speed = 2.8; game.spawnInterval = 1300;
     game.running = true; game.heartId = 0;
     $('#gameLives').textContent = game.lives;
     $('#gameScore').textContent = game.score;
@@ -1674,13 +1677,14 @@ function endGame() {
 }
 
 // Тап по полю — ловим сердечко под пальцем
-$('#gameField').addEventListener('click', e => {
+// pointerdown = мгновенная реакция без 300ms задержки мобильного click
+function handleGameTap(clientX, clientY) {
     if (!game.running) return;
     const field = $('#gameField');
     const rect  = field.getBoundingClientRect();
-    const tx = e.clientX - rect.left;
-    const ty = e.clientY - rect.top;
-    const hitRadius = 36;
+    const tx = clientX - rect.left;
+    const ty = clientY - rect.top;
+    const hitRadius = 60; // увеличенная зона захвата
     const hearts = [...document.querySelectorAll('.heart-drop')];
     let hit = null, bestDist = hitRadius;
     hearts.forEach(h => {
@@ -1692,7 +1696,6 @@ $('#gameField').addEventListener('click', e => {
     });
     if (hit) {
         const id = parseInt(hit.dataset.hid);
-        // pop-эффект на месте
         const pop = document.createElement('div');
         pop.className = 'heart-pop';
         pop.textContent = hit.textContent;
@@ -1706,6 +1709,11 @@ $('#gameField').addEventListener('click', e => {
         $('#gameScore').textContent = game.score;
         if (navigator.vibrate) navigator.vibrate(30);
     }
+}
+
+$('#gameField').addEventListener('pointerdown', e => {
+    e.preventDefault();
+    handleGameTap(e.clientX, e.clientY);
 });
 
 $('#gameRestartBtn').addEventListener('click', startHeartsGame);
