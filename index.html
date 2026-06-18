@@ -402,12 +402,21 @@
         .cphoto { opacity: 0; animation: photoIn .5s ease forwards; animation-delay: var(--del,0s); }
         @keyframes photoIn { to { opacity: 1; } }
         .clabel { font-family: 'Dancing Script',cursive; fill: rgba(255,240,245,.5); font-size: 8px; text-anchor: middle; }
-        .cname {
-            font-family: 'Cormorant Garamond',serif; fill: var(--star-color);
-            font-size: 20px; font-weight: 700; text-anchor: middle;
-            opacity: 0; animation: nameIn 1.2s ease forwards; animation-delay: 2.2s;
-        }
         @keyframes nameIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .const-name-label {
+            font-family: 'Cormorant Garamond',serif; font-weight: 700;
+            font-size: clamp(1.3rem,5vw,1.7rem);
+            color: var(--star-color);
+            text-align: center; width: 100%;
+            text-shadow: 0 0 14px var(--star-glow), 0 0 28px rgba(255,212,168,.3);
+            margin: 4px 0 2px;
+            opacity: 0; animation: nameIn 1.2s ease forwards 2.2s;
+        }
+        .const-tap-hint {
+            font-family: 'Dancing Script',cursive; font-size: .88rem;
+            color: rgba(255,240,245,.38); text-align: center; width: 100%;
+            margin-bottom: 6px;
+        }
         .finale-area { text-align: center; width: 100%; }
         .finale-offer { font-family: 'Dancing Script',cursive; font-size: 1.3rem; color: var(--cream); margin-bottom: 1rem; line-height: 1.5; }
         .finale-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: .7rem; }
@@ -513,8 +522,8 @@
 
         /* ── REDUCED MOTION ── */
         @media (prefers-reduced-motion: reduce) {
-            .sparkle-fall, .shooting, .heart-path, .cline, .cstar, .cphoto, .cname,
-            .screen-title, .ambient__moon, .btn-pulse { animation: none !important; }
+            .sparkle-fall, .shooting, .heart-path, .cline, .cstar, .cphoto,
+            .const-name-label, .screen-title, .ambient__moon, .btn-pulse { animation: none !important; }
             .heart-path { stroke-dashoffset: 0; }
             .cstar { transform: scale(1); }
             .screen-title { background: var(--cream); -webkit-text-fill-color: var(--cream); }
@@ -615,7 +624,9 @@
     <!-- SCREEN 5: Constellation -->
     <section class="screen" id="screen5" data-step="5">
         <h2 class="screen-title">Созвездие твоей любви</h2>
+        <p class="const-name-label" id="constNameLabel" style="opacity:0;margin-bottom:4px;">Elli ✦</p>
         <div class="const-wrap" id="constWrap"></div>
+        <p class="const-tap-hint">нажми на звезду, чтобы открыть фото</p>
         <div class="finale-area">
             <p class="finale-offer" id="finaleOffer"></p>
             <div class="finale-btns" id="finaleBtns">
@@ -647,6 +658,7 @@
         <div class="picnic-confirm-wrap">
             <button class="btn" id="picnicConfirmBtn" disabled>Собираю корзину!</button>
             <p class="picnic-resp" id="picnicResp"></p>
+            <button class="btn hidden" id="picnicCloseBtn" style="margin-top:10px;width:100%;">Ждём тебя! ❤️</button>
         </div>
     </div>
 </div>
@@ -1103,16 +1115,25 @@ function typewriter(el, text, spd, onDone) {
 /* ─────────────────────────────────────────────
    SCREEN 5 — CONSTELLATION
 ───────────────────────────────────────────── */
+// Форма «лиры»: вершина → два плеча → перекладина → основание
+//         0
+//        / \
+//       1   2
+//       |   |
+//       3   4
+//        \ /
+//     5   6
 const STARS_POS = [
-    { x: 55,  y: 42  },
-    { x: 160, y: 22  },
-    { x: 240, y: 58  },
-    { x: 218, y: 148 },
-    { x: 130, y: 188 },
-    { x: 38,  y: 132 },
-    { x: 135, y: 92  }
+    { x: 140, y: 22  },   // 0 — вершина
+    { x: 82,  y: 72  },   // 1 — левое плечо
+    { x: 198, y: 72  },   // 2 — правое плечо
+    { x: 68,  y: 138 },   // 3 — левый низ
+    { x: 212, y: 138 },   // 4 — правый низ
+    { x: 100, y: 188 },   // 5 — левое основание
+    { x: 180, y: 188 }    // 6 — правое основание
 ];
-const LINES = [[0,6],[1,6],[2,6],[3,4],[4,6],[5,6],[0,5],[1,2]];
+// Линии: вершина-плечи, перекладина, бока, основание
+const LINES = [[0,1],[0,2],[1,2],[1,3],[2,4],[3,4],[3,5],[4,6],[5,6]];
 const VW = 280, VH = 210;
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -1186,22 +1207,21 @@ function buildConstellation() {
         sc.style.setProperty('--oy',`${pos.y}px`);
         sc.addEventListener('click',() => showPhotoPopup(i));
         svg.appendChild(sc);
-
-        // label
-        const lbl = document.createElementNS(NS,'text');
-        lbl.setAttribute('x',pos.x); lbl.setAttribute('y',pos.y+24);
-        lbl.setAttribute('class','clabel');
-        lbl.textContent = CONFIG.photoLabels?.[i] || '';
-        svg.appendChild(lbl);
+        // подписи убраны — они показываются во всплывающем окне при тапе
     });
 
-    // name
-    const nm = document.createElementNS(NS,'text');
-    nm.setAttribute('x', VW/2); nm.setAttribute('y', VH-8);
-    nm.setAttribute('class','cname'); nm.textContent = 'Elli ✦';
-    svg.appendChild(nm);
-
     wrap.appendChild(svg);
+
+    // запускаем появление надписи над созвездием
+    const nameLabel = $('#constNameLabel');
+    if (nameLabel) {
+        nameLabel.style.animation = 'none';
+        nameLabel.style.opacity = '0';
+        setTimeout(() => {
+            nameLabel.style.animation = 'nameIn 1.2s ease forwards';
+        }, 2200);
+    }
+
     $('#finaleOffer').textContent = CONFIG.finaleText;
 }
 
@@ -1369,6 +1389,8 @@ function initPicnic() {
         chips.appendChild(c);
     });
     $('#picnicConfirmBtn').disabled = true;
+    $('#picnicConfirmBtn').classList.remove('hidden');
+    $('#picnicCloseBtn').classList.add('hidden');
     $('#picnicResp').classList.remove('show');
     $('#picnicResp').textContent = '';
 }
@@ -1387,6 +1409,11 @@ $('#picnicConfirmBtn').addEventListener('click', () => {
     }
     resp.classList.add('show');
     $('#picnicConfirmBtn').classList.add('hidden');
+    setTimeout(() => $('#picnicCloseBtn').classList.remove('hidden'), 600);
+});
+
+$('#picnicCloseBtn').addEventListener('click', () => {
+    $('#picnicOverlay').classList.remove('show');
 });
 
 /* ─────────────────────────────────────────────
