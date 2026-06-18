@@ -733,8 +733,8 @@
         </div>
         <div class="game-field" id="gameField"></div>
         <div class="game-over hidden" id="gameOver">
-            <p class="game-over-title">Игра окончена!</p>
-            <p class="game-over-score">Твой рекорд: <span id="gameFinalScore">0</span> ❤️</p>
+            <p class="game-over-title" id="gameOverTitle">Игра окончена!</p>
+            <p class="game-over-score" id="gameOverMsg">Поймала <span id="gameFinalScore">0</span> ❤️</p>
             <p class="game-over-best hidden" id="gameBestWrap">Лучший результат: <span id="gameBest">0</span> ❤️</p>
             <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;">
                 <button class="btn" id="gameRestartBtn">Ещё раз</button>
@@ -1668,6 +1668,19 @@ function endGame() {
     document.querySelectorAll('.heart-drop').forEach(e => e.remove());
     if (game.score > game.best) game.best = game.score;
     $('#gameFinalScore').textContent = game.score;
+
+    const titles = [
+        { min: 0,  max: 4,  title: 'Не страшно!',        msg: 'Поймала {n} ❤️ — в следующий раз будет больше!' },
+        { min: 5,  max: 9,  title: 'Неплохо!',            msg: 'Поймала {n} ❤️ — уже теплее 🌸' },
+        { min: 10, max: 14, title: 'Хорошо!',             msg: 'Поймала {n} ❤️ — ты молодец! ✦' },
+        { min: 15, max: 19, title: 'Отлично!',            msg: 'Поймала {n} ❤️ — быстрые руки 💕' },
+        { min: 20, max: 29, title: 'Невероятно!',         msg: 'Поймала {n} ❤️ — ты суперзвезда! 🌟' },
+        { min: 30, max: 999,'title': 'Легенда! 🏆',       msg: 'Поймала {n} ❤️ — ты непобедима!' }
+    ];
+    const t = titles.find(t => game.score >= t.min && game.score <= t.max) || titles[0];
+    $('#gameOverTitle').textContent = t.title;
+    $('#gameOverMsg').innerHTML = t.msg.replace('{n}', `<span id="gameFinalScore">${game.score}</span>`);
+
     const bestWrap = $('#gameBestWrap');
     if (game.best > 0 && game.score < game.best) {
         $('#gameBest').textContent = game.best;
