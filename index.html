@@ -578,6 +578,22 @@
             0% { transform: scale(1); opacity: 1; }
             100% { transform: scale(2.2) translateY(-24px); opacity: 0; }
         }
+        .phrase-pop {
+            position: absolute; pointer-events: none;
+            font-family: 'Cormorant Garamond', serif; font-style: italic;
+            font-size: clamp(.85rem, 3vw, 1.05rem); font-weight: 600;
+            color: var(--star-color); text-align: center;
+            text-shadow: 0 0 12px var(--star-glow);
+            width: 85%; transform: translateX(-50%);
+            white-space: normal; line-height: 1.35;
+            animation: phraseFly 2.2s ease forwards;
+        }
+        @keyframes phraseFly {
+            0%   { opacity: 0; transform: translateX(-50%) translateY(0) scale(.9); }
+            15%  { opacity: 1; transform: translateX(-50%) translateY(-10px) scale(1); }
+            80%  { opacity: 1; transform: translateX(-50%) translateY(-60px) scale(1); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-80px) scale(.95); }
+        }
         .miss-flash { animation: missFlash .25s ease; }
         @keyframes missFlash { 0%,100%{background:transparent} 50%{background:rgba(255,60,60,.18)} }
         .game-over {
@@ -1590,7 +1606,7 @@ $('#picnicCloseBtn').addEventListener('click', () => {
    HEARTS GAME
 ───────────────────────────────────────────── */
 const game = {
-    lives: 3, score: 0, best: 0,
+    lives: 3, score: 0, best: 0, phraseIdx: 0,
     speed: 2.8,        // начальная скорость (секунды на падение)
     spawnInterval: 1300, // мс между сердечками
     running: false,
@@ -1600,7 +1616,7 @@ const game = {
 };
 
 function startHeartsGame() {
-    game.lives = 3; game.score = 0; game.speed = 2.8; game.spawnInterval = 1300;
+    game.lives = 3; game.score = 0; game.speed = 2.8; game.spawnInterval = 1300; game.phraseIdx = 0;
     game.running = true; game.heartId = 0;
     $('#gameLives').textContent = game.lives;
     $('#gameScore').textContent = game.score;
@@ -1625,7 +1641,7 @@ function spawnHeart() {
     const field = $('#gameField');
     if (!field) return;
     const id = ++game.heartId;
-    const emojis = ['❤️','🩷','💕','💗','💓','💖'];
+    const emojis = ['❤️','🩷','💕','💗','💓','💖','💝','💘','💞','🌸','⭐','✨','🌟','💫'];
     const el = document.createElement('div');
     el.className = 'heart-drop';
     el.dataset.hid = id;
@@ -1691,6 +1707,36 @@ function endGame() {
 
 // Тап по полю — ловим сердечко под пальцем
 // pointerdown = мгновенная реакция без 300ms задержки мобильного click
+const GAME_PHRASES = [
+    'Владычица моих земель и морей',
+    'Императрица моего маленького мира',
+    'Королева моего шахматного сердца',
+    'Госпожа моих мыслей и сновидений',
+    'Повелительница моей судьбы',
+    'Царица моего безмолвного царства',
+    'Самодержица всех моих горизонтов',
+    'Княгиня, собравшая мои осколки воедино',
+    'Венценосная звезда на моём небосклоне',
+    'Альфа и Омега моего созвездия',
+    'Сердце моей галактики',
+    'Ось, вокруг которой вращается мой Млечный Путь',
+    'Самая яркая звезда в моём скоплении',
+    'Туманность, породившая мою вселенную',
+    'Главный свет в моём чёрном космосе',
+];
+
+function showPhrase(field, x, y) {
+    const phrase = GAME_PHRASES[game.phraseIdx % GAME_PHRASES.length];
+    game.phraseIdx++;
+    const el = document.createElement('div');
+    el.className = 'phrase-pop';
+    el.textContent = '✦ ' + phrase + ' ✦';
+    el.style.left = Math.min(Math.max(x, 42), field.clientWidth - 42) + 'px';
+    el.style.top  = Math.min(y, field.clientHeight - 80) + 'px';
+    field.appendChild(el);
+    setTimeout(() => el.remove(), 2300);
+}
+
 function handleGameTap(clientX, clientY) {
     if (!game.running) return;
     const field = $('#gameField');
@@ -1721,6 +1767,12 @@ function handleGameTap(clientX, clientY) {
         game.score++;
         $('#gameScore').textContent = game.score;
         if (navigator.vibrate) navigator.vibrate(30);
+        // каждые 5 пойманных — всплывает фраза
+        if (game.score % 5 === 0) {
+            const hr = hit.getBoundingClientRect();
+            const fr = field.getBoundingClientRect();
+            showPhrase(field, hr.left + hr.width/2 - fr.left, hr.top - fr.top);
+        }
     }
 }
 
