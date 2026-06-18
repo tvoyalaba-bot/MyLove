@@ -277,7 +277,8 @@
             width: 100%; position: relative; border-radius: 16px;
             overflow: hidden; margin-bottom: 1.3rem; flex-shrink: 0;
         }
-        .scratch-reveal { width: 100%; border-radius: 16px; overflow: hidden; }
+        .scratch-reveal { width: 100%; border-radius: 16px; overflow: hidden; opacity: 0; transition: opacity .15s; }
+        .scratch-reveal.ready { opacity: 1; }
         .scratch-photo {
             width: 100%; height: auto; max-height: 52vmax;
             object-fit: contain; object-position: center center;
@@ -415,7 +416,12 @@
             margin-bottom: 6px;
         }
         .finale-area { text-align: center; width: 100%; }
-        .finale-offer { font-family: 'Nunito',sans-serif; font-size: 1.3rem; color: var(--cream); margin-bottom: 1rem; line-height: 1.5; }
+        .finale-offer { font-family: 'Nunito',sans-serif; font-size: 1.15rem; color: var(--text-soft); margin-bottom: .75rem; line-height: 1.6; white-space: pre-line; }
+        .finale-question {
+            font-family: 'Cormorant Garamond',serif; font-size: clamp(1.35rem,5vw,1.65rem); font-weight: 600;
+            color: var(--star-color); text-align: center; margin-bottom: 1.1rem; line-height: 1.4;
+            text-shadow: 0 0 16px var(--star-glow);
+        }
         .finale-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: .7rem; }
         .finale-resp { font-family: 'Nunito',sans-serif; font-size: 1.35rem; color: var(--rose-light); margin-top: .6rem; line-height: 1.4; }
 
@@ -626,6 +632,7 @@
         <p class="const-tap-hint">нажми на звезду, чтобы открыть фото</p>
         <div class="finale-area">
             <p class="finale-offer" id="finaleOffer"></p>
+            <p class="finale-question" id="finaleQuestion"></p>
             <div class="finale-btns" id="finaleBtns">
                 <button class="btn" data-r="yes">ДА</button>
                 <button class="btn" data-r="very-yes">ОЧЕНЬ ДА</button>
@@ -936,6 +943,7 @@ function initScratch() {
     $('#scratchNext').classList.add('hidden');
     $('#scratchPhoto').src = pSrc(1);
     $('#scratchText').textContent = CONFIG.scratchText;
+    document.querySelector('.scratch-reveal').classList.remove('ready');
 
     // Ждём окончания CSS-перехода экрана (0.58s) + запас
     setTimeout(() => {
@@ -956,6 +964,9 @@ function initScratch() {
         newCanvas.style.cssText = `position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;touch-action:none;border-radius:16px;`;
 
         drawScratchOverlay(ctx, newCanvas.width, newCanvas.height);
+
+        // Показываем содержимое только после того как canvas-оверлей нарисован
+        document.querySelector('.scratch-reveal').classList.add('ready');
 
         let drawing = false;
 
@@ -1229,6 +1240,7 @@ function buildConstellation() {
     }
 
     $('#finaleOffer').textContent = CONFIG.finaleText;
+    $('#finaleQuestion').textContent = CONFIG.picnicOffer;
 }
 
 /* photo popup */
@@ -1366,14 +1378,70 @@ $('#saveBtn').addEventListener('click', async () => {
     ctx.font = '12px serif'; ctx.fillStyle = 'rgba(240,192,112,.45)';
     ctx.fillText(`✦ Созвездие Elli · ${new Date().toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})} ✦`, CW/2, CH - 8);
 
-    try {
+    function downloadCanvas(c, label) {
         const a = document.createElement('a');
         a.download = 'constellation-elli.png';
-        a.href = canvas.toDataURL('image/png');
+        a.href = c.toDataURL('image/png');
         a.click();
-        toast('Созвездие сохранено! ✦');
+        toast(label);
+    }
+
+    try {
+        downloadCanvas(canvas, 'Созвездие сохранено! ✦');
     } catch {
-        toast('Не удалось сохранить — попробуй в Chrome ✦');
+        // Браузер заблокировал canvas из-за локальных фото (tainted canvas).
+        // Перерисовываем без фото — это всегда работает в любом браузере.
+        const c2 = document.createElement('canvas');
+        c2.width = CW; c2.height = CH;
+        const ctx2 = c2.getContext('2d');
+
+        // фон
+        const g2 = ctx2.createLinearGradient(0, 0, 0, CH);
+        g2.addColorStop(0, '#0a0518'); g2.addColorStop(.4, '#160930'); g2.addColorStop(1, '#0a0520');
+        ctx2.fillStyle = g2; ctx2.fillRect(0, 0, CW, CH);
+        const rng2 = (() => { let s = 99; return () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/4294967296; }; })();
+        for (let i = 0; i < 130; i++) {
+            ctx2.beginPath(); ctx2.arc(rng2()*CW, rng2()*CH, rng2()*1.5+.3, 0, Math.PI*2);
+            ctx2.fillStyle = `rgba(255,255,255,${.12+rng2()*.72})`; ctx2.fill();
+        }
+
+        // линии
+        ctx2.strokeStyle = 'rgba(240,192,112,0.35)'; ctx2.lineWidth = 1.5;
+        LINES.forEach(([a, b]) => {
+            ctx2.beginPath();
+            ctx2.moveTo(sx(STARS_POS[a].x), sy(STARS_POS[a].y));
+            ctx2.lineTo(sx(STARS_POS[b].x), sy(STARS_POS[b].y));
+            ctx2.stroke();
+        });
+
+        // звёзды (без фото)
+        STARS_POS.forEach((pos, i) => {
+            const cx = sx(pos.x), cy = sy(pos.y);
+            const r = scale * 13;
+            // кольцо
+            ctx2.beginPath(); ctx2.arc(cx, cy, r, 0, Math.PI*2);
+            ctx2.strokeStyle = 'rgba(240,192,112,0.35)'; ctx2.lineWidth = 1; ctx2.stroke();
+            // точка
+            const sr = (i === 6 ? 7 : 5) * scale / (VW / 60);
+            ctx2.beginPath(); ctx2.arc(cx, cy, sr, 0, Math.PI*2);
+            ctx2.fillStyle = '#ffd4a8';
+            ctx2.shadowColor = 'rgba(255,212,168,.9)'; ctx2.shadowBlur = 10;
+            ctx2.fill(); ctx2.shadowBlur = 0;
+        });
+
+        // название и дата
+        ctx2.font = `bold ${Math.round(20 * scale / (VW/140))}px "Cormorant Garamond", serif`;
+        ctx2.fillStyle = '#ffd4a8'; ctx2.textAlign = 'center';
+        ctx2.shadowColor = 'rgba(255,212,168,.6)'; ctx2.shadowBlur = 12;
+        ctx2.fillText('Elli ✦', sx(VW/2), sy(VH - 4)); ctx2.shadowBlur = 0;
+        ctx2.font = '12px serif'; ctx2.fillStyle = 'rgba(240,192,112,.45)';
+        ctx2.fillText(`✦ Созвездие Elli · ${new Date().toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})} ✦`, CW/2, CH - 8);
+
+        try {
+            downloadCanvas(c2, 'Созвездие сохранено (без фото) ✦');
+        } catch {
+            toast('Открой файл в браузере Chrome ✦');
+        }
     }
 });
 
