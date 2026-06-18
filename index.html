@@ -1755,23 +1755,28 @@ function handleGameTap(clientX, clientY) {
     });
     if (hit) {
         const id = parseInt(hit.dataset.hid);
+        // сохраняем позицию ДО удаления
+        const hr = hit.getBoundingClientRect();
+        const fr = field.getBoundingClientRect();
+        const hcx = hr.left + hr.width/2 - fr.left;
+        const hcy = hr.top  + hr.height/2 - fr.top;
+
         const pop = document.createElement('div');
         pop.className = 'heart-pop';
         pop.textContent = hit.textContent;
-        const hr = hit.getBoundingClientRect();
-        pop.style.left = (hr.left + hr.width/2 - rect.left) + 'px';
-        pop.style.top  = (hr.top  + hr.height/2 - rect.top) + 'px';
+        pop.style.left = hcx + 'px';
+        pop.style.top  = hcy + 'px';
         field.appendChild(pop);
         setTimeout(() => pop.remove(), 520);
+
         removeHeart(id);
         game.score++;
         $('#gameScore').textContent = game.score;
         if (navigator.vibrate) navigator.vibrate(30);
+
         // каждые 5 пойманных — всплывает фраза
         if (game.score % 5 === 0) {
-            const hr = hit.getBoundingClientRect();
-            const fr = field.getBoundingClientRect();
-            showPhrase(field, hr.left + hr.width/2 - fr.left, hr.top - fr.top);
+            showPhrase(field, hcx, hcy - 30);
         }
     }
 }
